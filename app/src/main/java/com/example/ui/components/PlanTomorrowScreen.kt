@@ -62,6 +62,7 @@ import com.example.ui.theme.ConflictWarningRed
 import com.example.ui.theme.ElectricIndigo
 import com.example.ui.theme.NightBgDeep
 import com.example.ui.theme.NightBorderSubtle
+import com.example.ui.theme.NightCardElevated
 import com.example.ui.theme.NightCardSurface
 import com.example.ui.theme.NocturnalAmber
 import com.example.ui.theme.SyncSuccessGreen
@@ -236,88 +237,63 @@ private fun NocturnalTomorrowHeroBanner(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = NightCardElevated),
         border = BorderStroke(1.dp, NightBorderSubtle)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(178.dp)
+                .padding(20.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.img_night_banner_1794340792201),
-                contentDescription = "Ilustración de planificación nocturna",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                NightBgDeep.copy(alpha = 0.55f),
-                                NightBgDeep.copy(alpha = 0.92f)
-                            )
-                        )
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = NocturnalAmber.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, NocturnalAmber.copy(alpha = 0.35f))
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = NocturnalAmber.copy(alpha = 0.18f),
-                        border = BorderStroke(1.dp, NocturnalAmber.copy(alpha = 0.5f))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.NightsStay,
-                                contentDescription = null,
-                                tint = NocturnalAmber,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Modo Planificación Nocturna",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = NocturnalAmber
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.NightsStay,
+                            contentDescription = null,
+                            tint = NocturnalAmber,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Modo Planificación Nocturna",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = NocturnalAmber
+                        )
                     }
-
-                    SmallBadgePill(
-                        text = if (isCalendarConnected) "Google Calendar Activo" else "Calendar sin vincular",
-                        accentColor = if (isCalendarConnected) SyncSuccessGreen else TextMutedSlate
-                    )
                 }
 
-                Column {
-                    Text(
-                        text = "Mañana · $tomorrowHumanDate",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                        color = TextMoonlight
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Fecha objetivo: $tomorrowIso · $totalTasksCount bloques ($timeFormatted planificados) · $freeSlotsCount huecos libres",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextStarlight
-                    )
-                }
+                SmallBadgePill(
+                    text = if (isCalendarConnected) "Calendar Activo" else "Sin vincular",
+                    accentColor = if (isCalendarConnected) SyncSuccessGreen else TextMutedSlate
+                )
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = "Mañana · $tomorrowHumanDate",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = TextMoonlight
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "$totalTasksCount bloques ($timeFormatted planificados) · $freeSlotsCount huecos libres",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextStarlight
+            )
         }
     }
 }
@@ -479,13 +455,13 @@ private fun ConfirmTomorrowSyncCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF101C35)),
-        border = BorderStroke(1.dp, SyncSuccessGreen.copy(alpha = 0.45f))
+        colors = CardDefaults.cardColors(containerColor = NightCardElevated),
+        border = BorderStroke(1.dp, NightBorderSubtle)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(18.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -495,37 +471,38 @@ private fun ConfirmTomorrowSyncCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Cierre de Planificación Nocturna",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = SyncSuccessGreen
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = TextMoonlight
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "$syncEnabledCount de $totalTasks tareas con sync activo · $alreadySyncedCount ya vinculadas con eventId",
+                        text = "$syncEnabledCount de $totalTasks tareas marcadas para Google Calendar",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextStarlight
+                        color = TextMutedSlate
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Button(
                 onClick = onConfirmAndSync,
                 enabled = !isSyncing && syncEnabledCount > 0,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(50.dp)
                     .testTag("confirm_sync_tomorrow_btn"),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SyncSuccessGreen,
-                    contentColor = Color(0xFF041A11)
+                    containerColor = ElectricIndigo,
+                    contentColor = Color(0xFFFFFFFF)
                 )
             ) {
                 if (isSyncing) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = Color(0xFF041A11)
+                        color = Color.White
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(

@@ -4,8 +4,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
@@ -50,6 +53,7 @@ import com.example.model.NightTaskEntity
 import com.example.model.TaskCategory
 import com.example.ui.NightPlannerUiState
 import com.example.ui.theme.ElectricIndigo
+import com.example.ui.theme.NightBgDeep
 import com.example.ui.theme.NightBorderSubtle
 import com.example.ui.theme.NightCardElevated
 import com.example.ui.theme.NightCardSurface
@@ -89,7 +93,7 @@ fun TodayExecutionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(containerColor = NightCardElevated),
-                border = BorderStroke(1.dp, ElectricIndigo.copy(alpha = 0.4f))
+                border = BorderStroke(1.dp, NightBorderSubtle)
             ) {
                 Column(
                     modifier = Modifier
@@ -101,32 +105,45 @@ fun TodayExecutionScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.WbSunny,
-                                contentDescription = null,
-                                tint = NocturnalAmber,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(NocturnalAmber.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.WbSunny,
+                                    contentDescription = null,
+                                    tint = NocturnalAmber,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Modo Ejecución Diaria · Hoy",
+                                    text = "Modo Ejecución Diaria",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = TextMoonlight
                                 )
                                 Text(
                                     text = state.todayHumanEs,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = NocturnalAmber
+                                    color = TextMutedSlate
                                 )
                             }
                         }
 
+                        Spacer(modifier = Modifier.width(10.dp))
+
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = SyncSuccessGreen.copy(alpha = 0.16f),
-                            border = BorderStroke(1.dp, SyncSuccessGreen.copy(alpha = 0.45f))
+                            shape = RoundedCornerShape(10.dp),
+                            color = SyncSuccessGreen.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, SyncSuccessGreen.copy(alpha = 0.35f))
                         ) {
                             Text(
                                 text = "$percentageInt% Completado",
@@ -143,11 +160,11 @@ fun TodayExecutionScreen(
                         progress = { animatedProgress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(10.dp)
+                            .height(8.dp)
                             .clip(RoundedCornerShape(50))
                             .testTag("today_progress_bar"),
                         color = SyncSuccessGreen,
-                        trackColor = Color(0xFF0A101E),
+                        trackColor = NightBgDeep,
                         strokeCap = StrokeCap.Round
                     )
 
@@ -173,7 +190,7 @@ fun TodayExecutionScreen(
                             )
                         }
                         Text(
-                            text = "Marcar añade '✅' en Calendar",
+                            text = "Añade '✅' en Calendar",
                             style = MaterialTheme.typography.labelSmall,
                             color = TextMutedSlate
                         )
@@ -248,26 +265,26 @@ fun TodayExecutionScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = NightCardSurface),
-                border = BorderStroke(1.dp, NocturnalAmber.copy(alpha = 0.45f))
+                colors = CardDefaults.cardColors(containerColor = NightCardElevated),
+                border = BorderStroke(1.dp, NightBorderSubtle)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(18.dp)
                 ) {
                     Text(
-                        text = "¿Terminaste el día con tareas sin completar?",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = NocturnalAmber
+                        text = "¿Tareas pendientes al cerrar el día?",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = TextMoonlight
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Transfiere con un solo clic las ${state.todayPendingCount} tarea(s) pendiente(s) de hoy directamente al plan de mañana (${state.tomorrowDateIso}) y actualiza sus eventos en Google Calendar.",
+                        text = "Transfiere con un solo clic las ${state.todayPendingCount} tarea(s) pendiente(s) de hoy al plan de mañana (${state.tomorrowDateIso}) y actualiza su fecha en Google Calendar.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextStarlight
+                        color = TextMutedSlate
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = onMigratePendingToTomorrow,
                         enabled = state.todayPendingCount > 0 && !state.isSyncing,
@@ -277,8 +294,8 @@ fun TodayExecutionScreen(
                             .testTag("migrate_pending_tomorrow_btn"),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = NocturnalAmber,
-                            contentColor = Color(0xFF1C1300)
+                            containerColor = ElectricIndigo,
+                            contentColor = Color.White
                         )
                     ) {
                         Icon(

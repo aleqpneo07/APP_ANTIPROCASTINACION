@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -77,10 +78,12 @@ import com.example.ui.components.TimelineAndConflictsScreen
 import com.example.ui.components.TodayExecutionScreen
 import com.example.ui.theme.ConflictWarningRed
 import com.example.ui.theme.ElectricIndigo
+import com.example.ui.theme.ElectricIndigoBright
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.NightBgDeep
 import com.example.ui.theme.NightBgSurface
 import com.example.ui.theme.NightBorderSubtle
+import com.example.ui.theme.NightCardSurface
 import com.example.ui.theme.NocturnalAmber
 import com.example.ui.theme.SyncSuccessGreen
 import com.example.ui.theme.TextMoonlight
@@ -192,12 +195,11 @@ fun NightPlannerAppRoot(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = NightBgDeep,
-            contentWindowInsets = WindowInsets.safeDrawing,
+            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 NightPlannerTopBar(
-                    activeTab = state.activeTab,
                     isCalendarConnected = state.oAuthSettings.isConnected,
-                    onQuickSwitchTab = { viewModel.selectTab(it) }
+                    onNavigateToCalendar = { viewModel.selectTab(NightPlannerTab.GOOGLE_CALENDAR_GUIDE) }
                 )
             },
             bottomBar = {
@@ -240,9 +242,9 @@ fun NightPlannerAppRoot(
                                     )
                                 },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = ElectricIndigo,
-                                    selectedTextColor = ElectricIndigo,
-                                    indicatorColor = ElectricIndigo.copy(alpha = 0.16f),
+                                    selectedIconColor = ElectricIndigoBright,
+                                    selectedTextColor = TextMoonlight,
+                                    indicatorColor = ElectricIndigo.copy(alpha = 0.18f),
                                     unselectedIconColor = TextMutedSlate,
                                     unselectedTextColor = TextMutedSlate
                                 )
@@ -384,27 +386,31 @@ fun NightPlannerAppRoot(
 
 @Composable
 private fun NightPlannerTopBar(
-    activeTab: NightPlannerTab,
     isCalendarConnected: Boolean,
-    onQuickSwitchTab: (NightPlannerTab) -> Unit
+    onNavigateToCalendar: () -> Unit
 ) {
     Surface(
         color = NightBgSurface,
-        border = BorderStroke(1.dp, NightBorderSubtle)
+        border = BorderStroke(1.dp, NightBorderSubtle),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(ElectricIndigo.copy(alpha = 0.18f)),
+                        .background(ElectricIndigo.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -414,72 +420,49 @@ private fun NightPlannerTopBar(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "NightPlanner",
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = TextMoonlight
-                        )
-                        if (isCalendarConnected) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.Default.CloudDone,
-                                contentDescription = "Google Calendar Conectado",
-                                tint = SyncSuccessGreen,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
                     Text(
-                        text = "Planificación Nocturna · Google Calendar v3",
+                        text = "NightPlanner",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = TextMoonlight
+                    )
+                    Text(
+                        text = "Ritual Nocturno · Time Blocking",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextMutedSlate
                     )
                 }
             }
 
-            // Quick Mode Pill Switcher (Mañana vs Hoy)
+            Spacer(modifier = Modifier.width(12.dp))
+
             Surface(
+                onClick = onNavigateToCalendar,
                 shape = RoundedCornerShape(50),
-                color = NightBgDeep,
-                border = BorderStroke(1.dp, NightBorderSubtle)
+                color = if (isCalendarConnected) SyncSuccessGreen.copy(alpha = 0.12f) else NightCardSurface,
+                border = BorderStroke(
+                    1.dp,
+                    if (isCalendarConnected) SyncSuccessGreen.copy(alpha = 0.35f) else NightBorderSubtle
+                ),
+                modifier = Modifier.testTag("top_calendar_status_pill")
             ) {
                 Row(
-                    modifier = Modifier.padding(3.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val isPlan = activeTab == NightPlannerTab.PLAN_TOMORROW
-                    val isToday = activeTab == NightPlannerTab.EXECUTE_TODAY
-
-                    Surface(
-                        onClick = { onQuickSwitchTab(NightPlannerTab.PLAN_TOMORROW) },
-                        shape = RoundedCornerShape(50),
-                        color = if (isPlan) ElectricIndigo else Color.Transparent,
-                        modifier = Modifier.testTag("top_switch_plan_tomorrow")
-                    ) {
-                        Text(
-                            text = "🌙 Mañana",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (isPlan) Color(0xFF080C16) else TextStarlight,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
-
-                    Surface(
-                        onClick = { onQuickSwitchTab(NightPlannerTab.EXECUTE_TODAY) },
-                        shape = RoundedCornerShape(50),
-                        color = if (isToday) NocturnalAmber else Color.Transparent,
-                        modifier = Modifier.testTag("top_switch_today")
-                    ) {
-                        Text(
-                            text = "☀️ Hoy",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (isToday) Color(0xFF1A1100) else TextStarlight,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (isCalendarConnected) SyncSuccessGreen else TextMutedSlate)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isCalendarConnected) "Calendar Activo" else "Vincular Calendar",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = if (isCalendarConnected) SyncSuccessGreen else TextMutedSlate
+                    )
                 }
             }
         }

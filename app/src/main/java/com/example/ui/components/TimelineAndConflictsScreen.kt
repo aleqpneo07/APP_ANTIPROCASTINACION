@@ -45,6 +45,7 @@ import com.example.ui.NightPlannerUiState
 import com.example.ui.theme.CalendarImportedPurple
 import com.example.ui.theme.ConflictWarningRed
 import com.example.ui.theme.ElectricIndigo
+import com.example.ui.theme.NightBgDeep
 import com.example.ui.theme.NightBorderSubtle
 import com.example.ui.theme.NightCardElevated
 import com.example.ui.theme.NightCardSurface
@@ -287,8 +288,8 @@ fun TimelineAndConflictsScreen(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF0A101E),
-                            border = BorderStroke(1.dp, SyncSuccessGreen.copy(alpha = 0.3f))
+                            color = NightBgDeep,
+                            border = BorderStroke(1.dp, NightBorderSubtle)
                         ) {
                             Row(
                                 modifier = Modifier

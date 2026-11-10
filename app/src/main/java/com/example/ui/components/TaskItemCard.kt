@@ -92,8 +92,8 @@ fun TaskItemCard(
     )
     val borderColor by animateColorAsState(
         targetValue = when {
-            overlapWarning != null && !task.completed -> ConflictWarningRed.copy(alpha = 0.75f)
-            task.completed -> SyncSuccessGreen.copy(alpha = 0.35f)
+            overlapWarning != null && !task.completed -> ConflictWarningRed.copy(alpha = 0.5f)
+            task.completed -> SyncSuccessGreen.copy(alpha = 0.3f)
             else -> NightBorderSubtle
         },
         label = "borderColor"
@@ -107,7 +107,7 @@ fun TaskItemCard(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = NightCardSurface),
         border = BorderStroke(1.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -117,7 +117,7 @@ fun TaskItemCard(
             // Left Category Color Accent Strip
             Box(
                 modifier = Modifier
-                    .width(6.dp)
+                    .width(4.dp)
                     .fillMaxHeight()
                     .background(category.color)
             )

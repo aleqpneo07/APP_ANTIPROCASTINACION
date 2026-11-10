@@ -85,7 +85,7 @@ fun GoogleCalendarSetupScreen(
     var accessTokenInput by rememberSaveable { mutableStateOf("") }
     var refreshTokenInput by rememberSaveable { mutableStateOf("") }
     var emailInput by rememberSaveable(oAuth.connectedEmail) {
-        mutableStateOf(oAuth.connectedEmail.ifBlank { "aleqpneo.07@gmail.com" })
+        mutableStateOf(oAuth.connectedEmail.ifBlank { "tu_correo@gmail.com" })
     }
 
     var unscheduledAsAllDay by rememberSaveable(oAuth.unscheduledAsAllDay) {
@@ -488,7 +488,7 @@ fun GoogleCalendarSetupScreen(
                     GuideStepItem(
                         stepNumber = "2",
                         title = "Pantalla de Consentimiento OAuth (Modo Prueba)",
-                        body = "Ve a 'Pantalla de consentimiento de OAuth' > Tipo Externo > Estado de publicación: 'Pruebas' (Testing). En 'Usuarios de prueba' (Test users) pulsa '+ ADD USERS' y añade tu correo personal (ej. aleqpneo.07@gmail.com)."
+                        body = "Ve a 'Pantalla de consentimiento de OAuth' > Tipo Externo > Estado de publicación: 'Pruebas' (Testing). En 'Usuarios de prueba' (Test users) pulsa '+ ADD USERS' y añade tu correo de Google (ej. tu_correo@gmail.com)."
                     )
                     GuideStepItem(
                         stepNumber = "3",
