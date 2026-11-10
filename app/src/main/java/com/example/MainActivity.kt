@@ -270,10 +270,23 @@ fun NightPlannerAppRoot(
                                 onClick = { viewModel.selectTab(item.tab) },
                                 modifier = Modifier.testTag(item.testTag),
                                 icon = {
-                                    Icon(
-                                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                                        contentDescription = item.label
-                                    )
+                                    BadgedBox(
+                                        badge = {
+                                            if (item.badgeCount > 0) {
+                                                Badge(
+                                                    containerColor = item.badgeColor,
+                                                    contentColor = Color(0xFF080C16)
+                                                ) {
+                                                    Text(item.badgeCount.toString())
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                            contentDescription = item.label
+                                        )
+                                    }
                                 },
                                 label = { Text(item.label) }
                             )

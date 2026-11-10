@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Launch
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SettingsSuggest
@@ -254,7 +254,7 @@ fun GoogleCalendarSetupScreen(
                         )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Launch,
+                            imageVector = Icons.AutoMirrored.Filled.Launch,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )

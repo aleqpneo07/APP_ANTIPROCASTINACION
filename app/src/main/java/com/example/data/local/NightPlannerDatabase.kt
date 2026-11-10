@@ -30,7 +30,7 @@ abstract class NightPlannerDatabase : RoomDatabase() {
                     NightPlannerDatabase::class.java,
                     "night_planner.db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

@@ -185,23 +185,28 @@ class GoogleCalendarService(
         }
 
         val now = System.currentTimeMillis()
-        if (settings.tokenExpiryMillis in 1..now && settings.refreshToken.isNotBlank()) {
-            val refreshResp = runCatching {
-                oAuthApi.refreshAccessToken(
-                    clientId = settings.clientId,
-                    refreshToken = settings.refreshToken
-                )
-            }.getOrNull()
+        if (settings.tokenExpiryMillis in 1..now) {
+            if (settings.refreshToken.isNotBlank()) {
+                val refreshResp = runCatching {
+                    oAuthApi.refreshAccessToken(
+                        clientId = settings.clientId,
+                        refreshToken = settings.refreshToken
+                    )
+                }.getOrNull()
 
-            if (refreshResp != null && refreshResp.isSuccessful && refreshResp.body() != null) {
-                val body = refreshResp.body()!!
-                oAuthPrefs.saveOAuthTokens(
-                    accessToken = body.accessToken,
-                    refreshToken = body.refreshToken,
-                    expiresInSeconds = body.expiresIn
-                )
-                return Result.success("Bearer ${body.accessToken}")
+                if (refreshResp != null && refreshResp.isSuccessful && refreshResp.body() != null) {
+                    val body = refreshResp.body()!!
+                    oAuthPrefs.saveOAuthTokens(
+                        accessToken = body.accessToken,
+                        refreshToken = body.refreshToken,
+                        expiresInSeconds = body.expiresIn
+                    )
+                    return Result.success("Bearer ${body.accessToken}")
+                }
             }
+            return Result.failure(
+                IllegalStateException("El Access Token de Google Calendar ha expirado. Renueva tu sesión en la pestaña 'Calendar'.")
+            )
         }
 
         return Result.success("Bearer ${settings.accessToken}")

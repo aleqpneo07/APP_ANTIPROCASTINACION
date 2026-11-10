@@ -72,10 +72,18 @@ fun TimelineAndConflictsScreen(
     modifier: Modifier = Modifier
 ) {
     val conflictTaskIds = state.overlapWarnings.map { it.taskId }.toSet()
+    val syncedTaskEventIds = state.tomorrowTasks
+        .mapNotNull { it.googleEventId?.takeIf { id -> id.isNotBlank() } }
+        .toSet()
 
     val timelineBlocks = buildList {
         state.importedTomorrowEvents
-            .filter { !it.isAllDay && it.startTimeHHmm != null && it.endTimeHHmm != null }
+            .filter { ext ->
+                ext.id !in syncedTaskEventIds &&
+                    !ext.isAllDay &&
+                    ext.startTimeHHmm != null &&
+                    ext.endTimeHHmm != null
+            }
             .forEach { ext ->
                 add(
                     TimelineBlockItem(
@@ -337,7 +345,10 @@ fun TimelineAndConflictsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         unscheduledTasks.forEach { task ->
-                            val suggestedSlot = state.freeTimeSlots.first()
+                            val taskDur = task.durationMinutes ?: 60
+                            val suggestedSlot = state.freeTimeSlots.firstOrNull {
+                                it.durationMinutes >= taskDur
+                            } ?: state.freeTimeSlots.first()
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()

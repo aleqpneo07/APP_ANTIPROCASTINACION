@@ -36,9 +36,10 @@ object DateTimeHelper {
 
     fun formatHumanDateEs(dateIso: String): String {
         val parsed = runCatching { isoFormat.parse(dateIso) }.getOrNull() ?: return dateIso
-        val formatter = SimpleDateFormat("EEEE, d 'de' MMMM", Locale("es", "ES"))
+        val esLocale = Locale.forLanguageTag("es-ES")
+        val formatter = SimpleDateFormat("EEEE, d 'de' MMMM", esLocale)
         val raw = formatter.format(parsed)
-        return raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale("es", "ES")) else it.toString() }
+        return raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase(esLocale) else it.toString() }
     }
 
     fun currentTimeGreetingEs(): Pair<String, Boolean> {
@@ -75,21 +76,32 @@ object DateTimeHelper {
     }
 
     /**
-     * Returns (timeMin, timeMax) in RFC3339 for an entire local day [00:00:00 to 23:59:59].
+     * Returns (timeMin, timeMax) in RFC3339 for an entire local day [00:00:00 to next day 00:00:00].
      */
     fun getDayRfc3339Bounds(dateIso: String): Pair<String, String> {
         val min = toRfc3339DateTime(dateIso, "00:00")
-        val max = toRfc3339DateTime(dateIso, "23:59")
+        val nextDayIso = addDaysToIso(dateIso, 1)
+        val max = toRfc3339DateTime(nextDayIso, "00:00")
         return min to max
     }
 
     fun getLocalTimeZoneId(): String = TimeZone.getDefault().id
 
     /**
-     * Extracts "HH:mm" from a Google Calendar RFC3339 dateTime string such as "2026-11-11T14:30:00+01:00"
+     * Extracts local "HH:mm" from a Google Calendar RFC3339 dateTime string such as "2026-11-11T14:30:00+01:00"
      */
     fun extractHHmmFromRfc3339(rfc3339: String?): String? {
         if (rfc3339.isNullOrBlank()) return null
+        val parsedDate = runCatching {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).parse(rfc3339)
+        }.getOrNull() ?: runCatching {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).parse(rfc3339)
+        }.getOrNull()
+
+        if (parsedDate != null) {
+            return SimpleDateFormat("HH:mm", Locale.US).format(parsedDate)
+        }
+
         val tIndex = rfc3339.indexOf('T')
         if (tIndex == -1 || rfc3339.length < tIndex + 6) return null
         return rfc3339.substring(tIndex + 1, tIndex + 6)
@@ -106,16 +118,17 @@ object DateTimeHelper {
     ): List<OverlapWarning> {
         val warnings = mutableListOf<OverlapWarning>()
         val scheduledTasks = tasks.filter { !it.startTime.isNullOrBlank() && !it.endTime.isNullOrBlank() }
+        val syncedGoogleEventIds = tasks.mapNotNull { it.googleEventId?.takeIf { id -> id.isNotBlank() } }.toSet()
 
         for (task in scheduledTasks) {
             val tStart = QuickInputParser.toMinutesOfDay(task.startTime!!)
             val tEnd = QuickInputParser.toMinutesOfDay(task.endTime!!)
             if (tEnd <= tStart) continue
 
-            // Check against external Google Calendar events (excluding events created by this exact task)
+            // Check against external Google Calendar events (excluding events already linked to local tasks)
             for (ext in externalEvents) {
                 if (ext.isAllDay || ext.startTimeHHmm == null || ext.endTimeHHmm == null) continue
-                if (task.googleEventId != null && task.googleEventId == ext.id) continue
+                if (ext.id in syncedGoogleEventIds) continue
 
                 val eStart = QuickInputParser.toMinutesOfDay(ext.startTimeHHmm)
                 val eEnd = QuickInputParser.toMinutesOfDay(ext.endTimeHHmm)
@@ -158,7 +171,7 @@ object DateTimeHelper {
     }
 
     /**
-     * Computes available Free Time Slots ("Huecos Libres") between 07:30 and 22:30
+     * Computes available Free Time Slots ("Huecos Libres") between 08:00 and 22:00
      * taking into account both imported Google Calendar events and already time-blocked tasks.
      */
     fun calculateFreeTimeSlots(
@@ -168,6 +181,7 @@ object DateTimeHelper {
         dayEndMinutes: Int = 22 * 60   // 22:00
     ): List<FreeTimeSlot> {
         val busyIntervals = mutableListOf<Pair<Int, Int>>()
+        val syncedGoogleEventIds = tasks.mapNotNull { it.googleEventId?.takeIf { id -> id.isNotBlank() } }.toSet()
 
         tasks.forEach { task ->
             if (!task.startTime.isNullOrBlank() && !task.endTime.isNullOrBlank()) {
@@ -178,7 +192,7 @@ object DateTimeHelper {
         }
 
         externalEvents.forEach { ext ->
-            if (!ext.isAllDay && ext.startTimeHHmm != null && ext.endTimeHHmm != null) {
+            if (ext.id !in syncedGoogleEventIds && !ext.isAllDay && ext.startTimeHHmm != null && ext.endTimeHHmm != null) {
                 val s = QuickInputParser.toMinutesOfDay(ext.startTimeHHmm)
                 val e = QuickInputParser.toMinutesOfDay(ext.endTimeHHmm)
                 if (e > s) busyIntervals.add(s to e)

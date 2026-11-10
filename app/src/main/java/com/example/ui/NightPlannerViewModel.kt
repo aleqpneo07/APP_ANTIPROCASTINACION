@@ -207,12 +207,17 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
 
         val finalCategory = parsed.detectedCategory ?: explicitCategory
         val finalPriority = parsed.detectedPriority ?: explicitPriority
-        val finalStart = parsed.detectedStartTime ?: explicitStartTime?.takeIf { it.isNotBlank() }
-        var finalEnd = parsed.detectedEndTime ?: explicitEndTime?.takeIf { it.isNotBlank() }
-        val finalDuration = parsed.detectedDurationMinutes ?: explicitDurationMinutes
+        val finalStart = (parsed.detectedStartTime ?: explicitStartTime?.takeIf { it.isNotBlank() })
+            ?.let { QuickInputParser.normalizeHHmm(it) }
+        var finalEnd = (parsed.detectedEndTime ?: explicitEndTime?.takeIf { it.isNotBlank() })
+            ?.let { QuickInputParser.normalizeHHmm(it) }
+        var finalDuration = parsed.detectedDurationMinutes ?: explicitDurationMinutes
 
         if (finalStart != null && finalEnd == null && finalDuration != null && finalDuration > 0) {
             finalEnd = QuickInputParser.addMinutesToHHmm(finalStart, finalDuration)
+        } else if (finalStart != null && finalEnd != null) {
+            val diff = QuickInputParser.minutesBetween(finalStart, finalEnd)
+            if (diff > 0) finalDuration = diff
         }
 
         val newTask = NightTaskEntity(
@@ -273,11 +278,28 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
 
     fun saveEditedTask(updatedTask: NightTaskEntity) {
         controlState.update { it.copy(editingTask = null) }
+        val normStart = updatedTask.startTime?.takeIf { it.isNotBlank() }?.let { QuickInputParser.normalizeHHmm(it) }
+        var normEnd = updatedTask.endTime?.takeIf { it.isNotBlank() }?.let { QuickInputParser.normalizeHHmm(it) }
+        var normDuration = updatedTask.durationMinutes
+
+        if (normStart != null && normEnd == null && normDuration != null && normDuration > 0) {
+            normEnd = QuickInputParser.addMinutesToHHmm(normStart, normDuration)
+        } else if (normStart != null && normEnd != null) {
+            val diff = QuickInputParser.minutesBetween(normStart, normEnd)
+            if (diff > 0) normDuration = diff
+        }
+
+        val normalizedTask = updatedTask.copy(
+            startTime = normStart,
+            endTime = normEnd,
+            durationMinutes = normDuration
+        )
+
         viewModelScope.launch {
-            val err = repository.updateTaskAndSync(updatedTask)
+            val err = repository.updateTaskAndSync(normalizedTask)
             if (err != null) {
                 postStatus("Cambios guardados localmente. Error al actualizar Calendar: $err", isError = true)
-            } else if (updatedTask.syncWithCalendar && uiState.value.oAuthSettings.isConnected) {
+            } else if (normalizedTask.syncWithCalendar && uiState.value.oAuthSettings.isConnected) {
                 postStatus("Tarea y evento de Google Calendar actualizados correctamente (events.patch).")
             } else {
                 postStatus("Tarea actualizada correctamente.")

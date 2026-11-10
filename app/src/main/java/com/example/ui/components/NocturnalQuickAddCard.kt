@@ -119,6 +119,8 @@ fun NocturnalQuickAddCard(
             )
             rawTitle = ""
             notes = ""
+            startTimeInput = ""
+            endTimeInput = ""
             keyboardController?.hide()
         }
     }
@@ -299,6 +301,21 @@ fun NocturnalQuickAddCard(
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(color = NightBorderSubtle)
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    // Optional Notes Input
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("quick_task_notes_input"),
+                        label = { Text("Notas / Descripción (Opcional)", style = MaterialTheme.typography.labelSmall) },
+                        placeholder = { Text("Detalles adicionales que se sincronizarán en Google Calendar…") },
+                        maxLines = 2,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Category Selection Row
                     Text(

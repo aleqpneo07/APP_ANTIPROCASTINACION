@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +42,7 @@ import com.example.ui.theme.ElectricIndigo
 import com.example.ui.theme.NightCardElevated
 import com.example.ui.theme.TextMoonlight
 import com.example.ui.theme.TextMutedSlate
+import com.example.util.DateTimeHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,9 +52,12 @@ fun EditTaskBottomSheet(
     onSave: (NightTaskEntity) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val todayIso = DateTimeHelper.todayIso()
+    val tomorrowIso = DateTimeHelper.tomorrowIso()
 
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
     var notes by rememberSaveable(task.id) { mutableStateOf(task.notes) }
+    var targetDateIso by rememberSaveable(task.id) { mutableStateOf(task.targetDateIso) }
     var category by rememberSaveable(task.id) { mutableStateOf(task.categoryEnum) }
     var priority by rememberSaveable(task.id) { mutableStateOf(task.priorityEnum) }
     var startTime by rememberSaveable(task.id) { mutableStateOf(task.startTime.orEmpty()) }
@@ -70,6 +75,7 @@ fun EditTaskBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
@@ -112,7 +118,32 @@ fun EditTaskBottomSheet(
                 shape = RoundedCornerShape(12.dp)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "Día objetivo",
+                style = MaterialTheme.typography.labelLarge,
+                color = TextMutedSlate
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = targetDateIso == todayIso,
+                    onClick = { targetDateIso = todayIso },
+                    label = { Text("☀️ Hoy ($todayIso)") },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = targetDateIso == tomorrowIso,
+                    onClick = { targetDateIso = tomorrowIso },
+                    label = { Text("🌙 Mañana ($tomorrowIso)") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = "Categoría",
@@ -237,6 +268,7 @@ fun EditTaskBottomSheet(
                                 task.copy(
                                     title = title.trim(),
                                     notes = notes.trim(),
+                                    targetDateIso = targetDateIso,
                                     category = category.name,
                                     priority = priority.name,
                                     startTime = startTime.trim().ifBlank { null },
