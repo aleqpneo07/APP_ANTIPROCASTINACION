@@ -1,0 +1,6 @@
+{
+  "name": "NightPlanner",
+  "description": "Planificación nocturna inteligente para el día siguiente con Time Blocking y sincronización bidireccional con Google Calendar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

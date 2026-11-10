@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">NightPlanner</string>
+    <string name="tagline_nocturnal">Planifica esta noche. Ejecuta mañana sin fricción.</string>
+    <string name="tab_plan_tomorrow">Planificar Mañana</string>
+    <string name="tab_today">Ejecución Hoy</string>
+    <string name="tab_timeline">Agenda &amp; Huecos</string>
+    <string name="tab_calendar_setup">Google Calendar</string>
+    <string name="btn_sync_tomorrow">Confirmar y Sincronizar Día Siguiente</string>
+    <string name="btn_migrate_pending">Migrar pendientes a mañana</string>
+    <string name="quick_add_placeholder">Ej. Estudiar Cálculo #uni !alta @09:00-11:00</string>
+    <string name="empty_tomorrow_title">Tu lienzo para mañana está despejado</string>
+    <string name="empty_tomorrow_subtitle">Añade de 3 a 5 bloques clave antes de dormir para despertar con claridad absoluta.</string>
+    <string name="empty_today_title">No hay tareas pendientes para hoy</string>
+    <string name="empty_today_subtitle">Usa la vista Planificar Mañana o carga tareas en tu día actual.</string>
+</resources>
