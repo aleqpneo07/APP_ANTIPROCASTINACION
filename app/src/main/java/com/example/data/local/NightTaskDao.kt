@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface NightTaskDao {
 
-    @Query("SELECT * FROM night_tasks ORDER BY COALESCE(startTime, '99:99') ASC, createdAtMillis DESC")
+    @Query("SELECT * FROM night_tasks ORDER BY targetDateIso ASC, completed ASC, COALESCE(startTime, '99:99') ASC, createdAtMillis DESC")
     fun observeAllTasks(): Flow<List<NightTaskEntity>>
 
     @Query("SELECT * FROM night_tasks WHERE targetDateIso = :dateIso ORDER BY completed ASC, COALESCE(startTime, '99:99') ASC, createdAtMillis DESC")

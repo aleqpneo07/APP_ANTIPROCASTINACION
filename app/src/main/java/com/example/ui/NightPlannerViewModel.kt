@@ -16,6 +16,9 @@ import com.example.model.OverlapWarning
 import com.example.model.QuickInputParser
 import com.example.model.TaskCategory
 import com.example.model.TaskPriority
+import com.example.model.UniClassSession
+import com.example.model.UniSubject
+import com.example.model.UniversityScheduleRepository
 import com.example.util.DateTimeHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,25 +29,48 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class NightPlannerTab(val titleEs: String) {
-    PLAN_TOMORROW("Planificar Mañana"),
-    EXECUTE_TODAY("Hoy"),
-    TIMELINE_CONFLICTS("Agenda 24h"),
-    GOOGLE_CALENDAR_GUIDE("Google Calendar")
+    TASKS("Tareas"),
+    UNIVERSITY_SCHEDULE("Horario"),
+    TIMELINE_CONFLICTS("Agenda"),
+    GOOGLE_CALENDAR_GUIDE("Calendar")
+}
+
+enum class TaskDayFilter(val label: String) {
+    TODAY("Hoy"),
+    TOMORROW("Mañana"),
+    ALL("Todas")
 }
 
 data class NightPlannerUiState(
-    val activeTab: NightPlannerTab = NightPlannerTab.PLAN_TOMORROW,
+    val activeTab: NightPlannerTab = NightPlannerTab.TASKS,
+    val selectedDayFilter: TaskDayFilter = TaskDayFilter.TODAY,
+    val selectedCategoryFilter: TaskCategory? = null,
     val todayDateIso: String = DateTimeHelper.todayIso(),
     val tomorrowDateIso: String = DateTimeHelper.tomorrowIso(),
+    val afterTomorrowDateIso: String = DateTimeHelper.addDaysToIso(DateTimeHelper.todayIso(), 2),
     val todayHumanEs: String = DateTimeHelper.formatHumanDateEs(DateTimeHelper.todayIso()),
     val tomorrowHumanEs: String = DateTimeHelper.formatHumanDateEs(DateTimeHelper.tomorrowIso()),
+    val afterTomorrowHumanEs: String = DateTimeHelper.formatHumanDateEs(
+        DateTimeHelper.addDaysToIso(DateTimeHelper.todayIso(), 2)
+    ),
+    val allTasks: List<NightTaskEntity> = emptyList(),
     val todayTasks: List<NightTaskEntity> = emptyList(),
     val tomorrowTasks: List<NightTaskEntity> = emptyList(),
-    val selectedTodayCategoryFilter: TaskCategory? = null,
-    val selectedTomorrowCategoryFilter: TaskCategory? = null,
+    val importedTodayEvents: List<ExternalCalendarEvent> = emptyList(),
     val importedTomorrowEvents: List<ExternalCalendarEvent> = emptyList(),
-    val overlapWarnings: List<OverlapWarning> = emptyList(),
-    val freeTimeSlots: List<FreeTimeSlot> = emptyList(),
+    val todayUniClasses: List<UniClassSession> = UniversityScheduleRepository.sessionsForDateIso(
+        DateTimeHelper.todayIso()
+    ),
+    val tomorrowUniClasses: List<UniClassSession> = UniversityScheduleRepository.sessionsForDateIso(
+        DateTimeHelper.tomorrowIso()
+    ),
+    val overlapWarningsToday: List<OverlapWarning> = emptyList(),
+    val overlapWarningsTomorrow: List<OverlapWarning> = emptyList(),
+    val freeTimeSlotsToday: List<FreeTimeSlot> = emptyList(),
+    val freeTimeSlotsTomorrow: List<FreeTimeSlot> = emptyList(),
+    val includeUniInFreeSlots: Boolean = true,
+    val composerPrefillTitle: String? = null,
+    val composerPrefillCategory: TaskCategory? = null,
     val oAuthSettings: OAuthSettingsState = OAuthSettingsState(),
     val isSyncing: Boolean = false,
     val isLoadingCalendarEvents: Boolean = false,
@@ -52,34 +78,46 @@ data class NightPlannerUiState(
     val isStatusError: Boolean = false,
     val editingTask: NightTaskEntity? = null
 ) {
-    val filteredTodayTasks: List<NightTaskEntity>
-        get() = if (selectedTodayCategoryFilter == null) {
-            todayTasks
-        } else {
-            todayTasks.filter { it.categoryEnum == selectedTodayCategoryFilter }
+    val activeDateIso: String
+        get() = when (selectedDayFilter) {
+            TaskDayFilter.TOMORROW -> tomorrowDateIso
+            TaskDayFilter.TODAY, TaskDayFilter.ALL -> todayDateIso
         }
 
-    val filteredTomorrowTasks: List<NightTaskEntity>
-        get() = if (selectedTomorrowCategoryFilter == null) {
-            tomorrowTasks
-        } else {
-            tomorrowTasks.filter { it.categoryEnum == selectedTomorrowCategoryFilter }
+    val activeHumanDateEs: String
+        get() = when (selectedDayFilter) {
+            TaskDayFilter.TODAY -> todayHumanEs
+            TaskDayFilter.TOMORROW -> tomorrowHumanEs
+            TaskDayFilter.ALL -> "Todas tus actividades"
         }
 
-    val todayCompletedCount: Int
-        get() = todayTasks.count { it.completed }
+    val tasksForSelectedFilter: List<NightTaskEntity>
+        get() = when (selectedDayFilter) {
+            TaskDayFilter.TODAY -> todayTasks
+            TaskDayFilter.TOMORROW -> tomorrowTasks
+            TaskDayFilter.ALL -> allTasks
+        }
 
-    val todayPendingCount: Int
-        get() = todayTasks.count { !it.completed }
+    val filteredTasks: List<NightTaskEntity>
+        get() = if (selectedCategoryFilter == null) {
+            tasksForSelectedFilter
+        } else {
+            tasksForSelectedFilter.filter { it.categoryEnum == selectedCategoryFilter }
+        }
 
-    val todayProgressFraction: Float
-        get() = if (todayTasks.isEmpty()) 0f else todayCompletedCount.toFloat() / todayTasks.size.toFloat()
+    val selectedCompletedCount: Int
+        get() = tasksForSelectedFilter.count { it.completed }
 
-    val tomorrowPendingSyncCount: Int
-        get() = tomorrowTasks.count { it.syncWithCalendar && it.googleEventId.isNullOrBlank() }
+    val selectedPendingCount: Int
+        get() = tasksForSelectedFilter.count { !it.completed }
 
-    val tomorrowTotalPlannedMinutes: Int
-        get() = tomorrowTasks.sumOf { task ->
+    val selectedProgressFraction: Float
+        get() = if (tasksForSelectedFilter.isEmpty()) 0f else {
+            selectedCompletedCount.toFloat() / tasksForSelectedFilter.size.toFloat()
+        }
+
+    val selectedTotalMinutes: Int
+        get() = tasksForSelectedFilter.sumOf { task ->
             when {
                 !task.startTime.isNullOrBlank() && !task.endTime.isNullOrBlank() ->
                     QuickInputParser.minutesBetween(task.startTime, task.endTime)
@@ -87,13 +125,51 @@ data class NightPlannerUiState(
                 else -> 0
             }
         }
+
+    val todayPendingCount: Int
+        get() = todayTasks.count { !it.completed }
+
+    val totalPendingCount: Int
+        get() = allTasks.count { !it.completed }
+
+    val activeExternalEvents: List<ExternalCalendarEvent>
+        get() = when (selectedDayFilter) {
+            TaskDayFilter.TOMORROW -> importedTomorrowEvents
+            TaskDayFilter.TODAY, TaskDayFilter.ALL -> importedTodayEvents
+        }
+
+    val activeUniClasses: List<UniClassSession>
+        get() = when (selectedDayFilter) {
+            TaskDayFilter.TOMORROW -> tomorrowUniClasses
+            TaskDayFilter.TODAY, TaskDayFilter.ALL -> todayUniClasses
+        }
+
+    val activeOverlapWarnings: List<OverlapWarning>
+        get() = when (selectedDayFilter) {
+            TaskDayFilter.TODAY -> overlapWarningsToday
+            TaskDayFilter.TOMORROW -> overlapWarningsTomorrow
+            TaskDayFilter.ALL -> (overlapWarningsToday + overlapWarningsTomorrow).distinctBy { it.taskId }
+        }
+
+    val activeFreeTimeSlots: List<FreeTimeSlot>
+        get() = when (selectedDayFilter) {
+            TaskDayFilter.TOMORROW -> freeTimeSlotsTomorrow
+            TaskDayFilter.TODAY, TaskDayFilter.ALL -> freeTimeSlotsToday
+        }
+
+    val totalOverlapCount: Int
+        get() = (overlapWarningsToday + overlapWarningsTomorrow).distinctBy { it.taskId }.size
 }
 
 private data class LocalViewControlState(
-    val activeTab: NightPlannerTab = NightPlannerTab.PLAN_TOMORROW,
-    val selectedTodayCategory: TaskCategory? = null,
-    val selectedTomorrowCategory: TaskCategory? = null,
-    val importedEvents: List<ExternalCalendarEvent> = emptyList(),
+    val activeTab: NightPlannerTab = NightPlannerTab.TASKS,
+    val selectedDayFilter: TaskDayFilter = TaskDayFilter.TODAY,
+    val selectedCategory: TaskCategory? = null,
+    val importedTodayEvents: List<ExternalCalendarEvent> = emptyList(),
+    val importedTomorrowEvents: List<ExternalCalendarEvent> = emptyList(),
+    val includeUniInFreeSlots: Boolean = true,
+    val composerPrefillTitle: String? = null,
+    val composerPrefillCategory: TaskCategory? = null,
     val isSyncing: Boolean = false,
     val isLoadingCalendar: Boolean = false,
     val statusMessage: String? = null,
@@ -111,36 +187,71 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
 
     private val todayIso = DateTimeHelper.todayIso()
     private val tomorrowIso = DateTimeHelper.tomorrowIso()
+    private val afterTomorrowIso = DateTimeHelper.addDaysToIso(todayIso, 2)
 
     private val controlState = MutableStateFlow(LocalViewControlState())
 
     val uiState: StateFlow<NightPlannerUiState> = combine(
-        repository.observeTasksForDate(todayIso),
-        repository.observeTasksForDate(tomorrowIso),
+        repository.observeAllTasks(),
         repository.oAuthSettingsFlow,
         controlState
-    ) { todayList, tomorrowList, oAuth, ctrl ->
-        val overlaps = DateTimeHelper.detectScheduleOverlaps(
-            tasks = tomorrowList,
-            externalEvents = ctrl.importedEvents
+    ) { allTasks, oAuth, ctrl ->
+        val todayList = allTasks.filter { it.targetDateIso == todayIso }
+        val tomorrowList = allTasks.filter { it.targetDateIso == tomorrowIso }
+
+        val todayUniVirtual = if (ctrl.includeUniInFreeSlots) {
+            UniversityScheduleRepository.toVirtualExternalEvents(todayIso)
+        } else {
+            emptyList()
+        }
+        val tomorrowUniVirtual = if (ctrl.includeUniInFreeSlots) {
+            UniversityScheduleRepository.toVirtualExternalEvents(tomorrowIso)
+        } else {
+            emptyList()
+        }
+
+        val overlapsToday = DateTimeHelper.detectScheduleOverlaps(
+            tasks = todayList,
+            externalEvents = ctrl.importedTodayEvents + todayUniVirtual
         )
-        val freeSlots = DateTimeHelper.calculateFreeTimeSlots(
+        val overlapsTomorrow = DateTimeHelper.detectScheduleOverlaps(
             tasks = tomorrowList,
-            externalEvents = ctrl.importedEvents
+            externalEvents = ctrl.importedTomorrowEvents + tomorrowUniVirtual
         )
+
+        val freeToday = DateTimeHelper.calculateFreeTimeSlots(
+            tasks = todayList,
+            externalEvents = ctrl.importedTodayEvents + todayUniVirtual
+        )
+        val freeTomorrow = DateTimeHelper.calculateFreeTimeSlots(
+            tasks = tomorrowList,
+            externalEvents = ctrl.importedTomorrowEvents + tomorrowUniVirtual
+        )
+
         NightPlannerUiState(
             activeTab = ctrl.activeTab,
+            selectedDayFilter = ctrl.selectedDayFilter,
+            selectedCategoryFilter = ctrl.selectedCategory,
             todayDateIso = todayIso,
             tomorrowDateIso = tomorrowIso,
+            afterTomorrowDateIso = afterTomorrowIso,
             todayHumanEs = DateTimeHelper.formatHumanDateEs(todayIso),
             tomorrowHumanEs = DateTimeHelper.formatHumanDateEs(tomorrowIso),
+            afterTomorrowHumanEs = DateTimeHelper.formatHumanDateEs(afterTomorrowIso),
+            allTasks = allTasks,
             todayTasks = todayList,
             tomorrowTasks = tomorrowList,
-            selectedTodayCategoryFilter = ctrl.selectedTodayCategory,
-            selectedTomorrowCategoryFilter = ctrl.selectedTomorrowCategory,
-            importedTomorrowEvents = ctrl.importedEvents,
-            overlapWarnings = overlaps,
-            freeTimeSlots = freeSlots,
+            importedTodayEvents = ctrl.importedTodayEvents,
+            importedTomorrowEvents = ctrl.importedTomorrowEvents,
+            todayUniClasses = UniversityScheduleRepository.sessionsForDateIso(todayIso),
+            tomorrowUniClasses = UniversityScheduleRepository.sessionsForDateIso(tomorrowIso),
+            overlapWarningsToday = overlapsToday,
+            overlapWarningsTomorrow = overlapsTomorrow,
+            freeTimeSlotsToday = freeToday,
+            freeTimeSlotsTomorrow = freeTomorrow,
+            includeUniInFreeSlots = ctrl.includeUniInFreeSlots,
+            composerPrefillTitle = ctrl.composerPrefillTitle,
+            composerPrefillCategory = ctrl.composerPrefillCategory,
             oAuthSettings = oAuth,
             isSyncing = ctrl.isSyncing,
             isLoadingCalendarEvents = ctrl.isLoadingCalendar,
@@ -159,7 +270,7 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
             NightPlannerDatabase.seedInitialDataIfEmpty(dao)
             val currentSettings = oAuthPrefs.getCurrentSettings()
             if (currentSettings.isConnected) {
-                refreshTomorrowGoogleCalendarEvents(silent = true)
+                refreshGoogleCalendarEvents(silent = true)
             }
         }
     }
@@ -168,12 +279,33 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
         controlState.update { it.copy(activeTab = tab) }
     }
 
-    fun setTodayCategoryFilter(category: TaskCategory?) {
-        controlState.update { it.copy(selectedTodayCategory = category) }
+    fun selectDayFilter(filter: TaskDayFilter) {
+        controlState.update { it.copy(selectedDayFilter = filter) }
     }
 
-    fun setTomorrowCategoryFilter(category: TaskCategory?) {
-        controlState.update { it.copy(selectedTomorrowCategory = category) }
+    fun setCategoryFilter(category: TaskCategory?) {
+        controlState.update { it.copy(selectedCategory = category) }
+    }
+
+    fun toggleIncludeUniInFreeSlots() {
+        controlState.update { it.copy(includeUniInFreeSlots = !it.includeUniInFreeSlots) }
+    }
+
+    fun prefillTaskFromUniClass(subject: UniSubject, isPractice: Boolean) {
+        val prefix = if (isPractice) "Práctica ${subject.abbr}" else "Tarea / AAD ${subject.abbr}"
+        controlState.update {
+            it.copy(
+                activeTab = NightPlannerTab.TASKS,
+                composerPrefillTitle = "$prefix #uni ",
+                composerPrefillCategory = TaskCategory.UNIVERSIDAD
+            )
+        }
+    }
+
+    fun consumeComposerPrefill() {
+        controlState.update {
+            it.copy(composerPrefillTitle = null, composerPrefillCategory = null)
+        }
     }
 
     fun clearStatusBanner() {
@@ -185,10 +317,11 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
     }
 
     /**
-     * Adds a task to Tomorrow ("Planificar Mañana") supporting inline keyboard shortcuts
-     * (`#uni`, `#gym`, `!alta`, `@09:00-10:30`, `+60m`) as well as explicit form selectors.
+     * Adds a task/activity for any chosen date (`todayIso`, `tomorrowIso`, etc.), supporting inline
+     * shortcuts (`#uni`, `#gym`, `!alta`, `@09:00-10:30`, `+60m`) as well as explicit form selectors.
      */
-    fun addTaskForTomorrow(
+    fun addTaskForDate(
+        targetDateIso: String,
         rawTitleInput: String,
         notes: String = "",
         explicitCategory: TaskCategory,
@@ -201,7 +334,7 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
         val parsed = QuickInputParser.parse(rawTitleInput)
         val finalTitle = parsed.cleanTitle.ifBlank { rawTitleInput.trim() }
         if (finalTitle.isBlank()) {
-            postStatus("Escribe un título para la tarea de mañana.", isError = true)
+            postStatus("Escribe un título para la tarea o actividad.", isError = true)
             return
         }
 
@@ -223,7 +356,7 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
         val newTask = NightTaskEntity(
             title = finalTitle,
             notes = notes.trim(),
-            targetDateIso = tomorrowIso,
+            targetDateIso = targetDateIso,
             category = finalCategory.name,
             priority = finalPriority.name,
             startTime = finalStart,
@@ -233,25 +366,38 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
             completed = false
         )
 
+        // Ensure the user immediately sees the date where they placed the task
+        controlState.update { ctrl ->
+            val updatedFilter = when {
+                ctrl.selectedDayFilter == TaskDayFilter.ALL -> TaskDayFilter.ALL
+                targetDateIso == todayIso -> TaskDayFilter.TODAY
+                targetDateIso == tomorrowIso -> TaskDayFilter.TOMORROW
+                else -> TaskDayFilter.ALL
+            }
+            ctrl.copy(selectedDayFilter = updatedFilter)
+        }
+
+        val dateLabel = when (targetDateIso) {
+            todayIso -> "hoy"
+            tomorrowIso -> "mañana"
+            else -> targetDateIso
+        }
+
         viewModelScope.launch {
             val (saved, syncErr) = repository.createTask(newTask, syncImmediatelyIfConnected = true)
             if (syncErr != null) {
                 postStatus(
-                    "Tarea guardada localmente. Pendiente de sincronizar con Calendar: $syncErr",
+                    "Actividad guardada localmente para $dateLabel. Pendiente de Calendar: $syncErr",
                     isError = true
                 )
             } else if (!saved.googleEventId.isNullOrBlank()) {
-                postStatus("Tarea añadida para mañana y creada en Google Calendar (ID: ${saved.googleEventId.take(10)}…).")
+                postStatus("Actividad añadida para $dateLabel y sincronizada con Google Calendar.")
             } else {
-                postStatus("Tarea añadida al plan de mañana (${finalCategory.displayName}).")
+                postStatus("Actividad añadida para $dateLabel (${finalCategory.displayName}).")
             }
         }
     }
 
-    /**
-     * Toggles task completion (`completed`) in local SQLite and immediately patches the
-     * Google Calendar event (`events.patch`) with the "✅ " prefix and Basil green `colorId`.
-     */
     fun toggleTaskCompletion(task: NightTaskEntity) {
         val newCompleted = !task.completed
         val updated = task.copy(
@@ -261,9 +407,9 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             val err = repository.updateTaskAndSync(updated)
             if (err != null) {
-                postStatus("Estado actualizado localmente (error al sincronizar con Calendar: $err)", isError = true)
+                postStatus("Estado actualizado localmente (error al sincronizar Calendar: $err)", isError = true)
             } else if (newCompleted && !task.googleEventId.isNullOrBlank()) {
-                postStatus("¡Tarea completada! Evento actualizado con prefijo '✅' en Google Calendar.")
+                postStatus("¡Actividad completada! Evento marcado con '✅' en Google Calendar.")
             }
         }
     }
@@ -300,7 +446,7 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
             if (err != null) {
                 postStatus("Cambios guardados localmente. Error al actualizar Calendar: $err", isError = true)
             } else if (normalizedTask.syncWithCalendar && uiState.value.oAuthSettings.isConnected) {
-                postStatus("Tarea y evento de Google Calendar actualizados correctamente (events.patch).")
+                postStatus("Tarea y evento de Google Calendar actualizados correctamente.")
             } else {
                 postStatus("Tarea actualizada correctamente.")
             }
@@ -316,16 +462,13 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
             if (err != null) {
                 postStatus("Tarea eliminada localmente (aviso Calendar: $err)", isError = true)
             } else if (!task.googleEventId.isNullOrBlank()) {
-                postStatus("Tarea eliminada de NightPlanner y de tu Google Calendar (events.delete).")
+                postStatus("Tarea eliminada de la app y de tu Google Calendar.")
             } else {
                 postStatus("Tarea eliminada.")
             }
         }
     }
 
-    /**
-     * Resolves an overlap or schedules an unscheduled task into a specific free slot with 1 tap.
-     */
     fun assignTaskToTimeWindow(task: NightTaskEntity, startHHmm: String, durationMin: Int = 60) {
         val actualDuration = task.durationMinutes?.takeIf { it in 15..240 } ?: durationMin
         val endHHmm = QuickInputParser.addMinutesToHHmm(startHHmm, actualDuration)
@@ -337,37 +480,37 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             val err = repository.updateTaskAndSync(updated)
             if (err == null) {
-                postStatus("Bloque horario asignado: $startHHmm – $endHHmm para '${task.title.take(28)}'.")
+                postStatus("Horario asignado: $startHHmm – $endHHmm para '${task.title.take(28)}'.")
             } else {
                 postStatus("Horario asignado localmente ($startHHmm – $endHHmm). Calendar: $err", isError = true)
             }
         }
     }
 
-    /**
-     * "Confirmar y Sincronizar Día Siguiente":
-     * Batch-syncs all tomorrow's tasks with `syncWithCalendar = true` to the user's primary Google Calendar.
-     */
-    fun confirmAndSyncTomorrow() {
+    fun confirmAndSyncActiveDateTasks() {
+        val targetDate = uiState.value.activeDateIso
         viewModelScope.launch {
             controlState.update { it.copy(isSyncing = true, statusMessage = null) }
-            val summary = repository.confirmAndSyncDateTasks(tomorrowIso)
-            // Also refresh tomorrow's external events after syncing
+            val summary = repository.confirmAndSyncDateTasks(targetDate)
             if (uiState.value.oAuthSettings.isConnected) {
-                val extResult = repository.fetchTomorrowExternalEvents(tomorrowIso)
-                if (extResult.isSuccess) {
-                    controlState.update { it.copy(importedEvents = extResult.getOrDefault(emptyList())) }
+                val todayRes = repository.fetchTomorrowExternalEvents(todayIso)
+                val tomorrowRes = repository.fetchTomorrowExternalEvents(tomorrowIso)
+                controlState.update {
+                    it.copy(
+                        importedTodayEvents = todayRes.getOrDefault(it.importedTodayEvents),
+                        importedTomorrowEvents = tomorrowRes.getOrDefault(it.importedTomorrowEvents)
+                    )
                 }
             }
             controlState.update { it.copy(isSyncing = false) }
 
             when {
                 summary.totalCandidates == 0 -> {
-                    postStatus(summary.firstErrorMessage ?: "No hay tareas para sincronizar mañana.", isError = true)
+                    postStatus(summary.firstErrorMessage ?: "No hay tareas marcadas para sincronizar en esta fecha.", isError = true)
                 }
                 summary.failedCount == 0 -> {
                     postStatus(
-                        "¡Sincronización completada! ${summary.syncedSuccessfully} de ${summary.totalCandidates} tareas enviadas a tu Google Calendar principal."
+                        "¡Sincronización completada! ${summary.syncedSuccessfully} de ${summary.totalCandidates} tareas enviadas a Google Calendar."
                     )
                 }
                 summary.syncedSuccessfully > 0 -> {
@@ -386,11 +529,6 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    /**
-     * "Migrar pendientes a mañana":
-     * Moves all incomplete tasks from Today to Tomorrow with a single click and patches their
-     * Google Calendar events if synced.
-     */
     fun migratePendingTodayToTomorrow() {
         viewModelScope.launch {
             controlState.update { it.copy(isSyncing = true) }
@@ -401,39 +539,43 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
             controlState.update { it.copy(isSyncing = false) }
 
             if (migratedCount == 0) {
-                postStatus("¡Todo al día! No tienes tareas pendientes hoy para migrar.")
+                postStatus("¡Todo al día! No tienes tareas pendientes hoy para mover.")
             } else {
                 val calSuffix = if (calendarPatchedCount > 0) {
                     " y $calendarPatchedCount eventos actualizados en Google Calendar."
                 } else {
                     "."
                 }
-                postStatus("Se migraron $migratedCount tareas pendientes al plan de mañana$calSuffix")
+                postStatus("Se movieron $migratedCount tareas pendientes a mañana$calSuffix")
             }
         }
     }
 
-    /**
-     * Reads existing events from the user's primary Google Calendar for tomorrow (`listTomorrowEvents`)
-     * to prevent overlaps and calculate available time slots.
-     */
-    fun refreshTomorrowGoogleCalendarEvents(silent: Boolean = false) {
+    fun refreshGoogleCalendarEvents(silent: Boolean = false) {
         viewModelScope.launch {
             controlState.update { it.copy(isLoadingCalendar = true) }
-            val result = repository.fetchTomorrowExternalEvents(tomorrowIso)
+            val todayRes = repository.fetchTomorrowExternalEvents(todayIso)
+            val tomorrowRes = repository.fetchTomorrowExternalEvents(tomorrowIso)
             controlState.update { it.copy(isLoadingCalendar = false) }
 
-            if (result.isSuccess) {
-                val events = result.getOrDefault(emptyList())
-                controlState.update { it.copy(importedEvents = events) }
+            if (todayRes.isSuccess || tomorrowRes.isSuccess) {
+                val todayEvs = todayRes.getOrDefault(emptyList())
+                val tomorrowEvs = tomorrowRes.getOrDefault(emptyList())
+                controlState.update {
+                    it.copy(
+                        importedTodayEvents = todayEvs,
+                        importedTomorrowEvents = tomorrowEvs
+                    )
+                }
                 if (!silent) {
-                    postStatus("Importados ${events.size} eventos existentes de tu Google Calendar para mañana.")
+                    val total = todayEvs.size + tomorrowEvs.size
+                    postStatus("Importados $total eventos de Google Calendar (Hoy y Mañana).")
                 }
             } else if (!silent) {
-                postStatus(
-                    result.exceptionOrNull()?.message ?: "Error al leer eventos de Google Calendar.",
-                    isError = true
-                )
+                val msg = todayRes.exceptionOrNull()?.message
+                    ?: tomorrowRes.exceptionOrNull()?.message
+                    ?: "Error al leer eventos de Google Calendar."
+                postStatus(msg, isError = true)
             }
         }
     }
@@ -457,7 +599,7 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
             controlState.update { it.copy(isSyncing = false) }
             if (res.isSuccess) {
                 postStatus(res.getOrThrow())
-                refreshTomorrowGoogleCalendarEvents(silent = false)
+                refreshGoogleCalendarEvents(silent = false)
             } else {
                 postStatus(res.exceptionOrNull()?.message ?: "Error en callback OAuth 2.0", isError = true)
             }
@@ -481,8 +623,8 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
                 expiresInSeconds = 3600L,
                 email = email.ifBlank { "Cuenta principal (primary)" }
             )
-            postStatus("Token OAuth 2.0 guardado. Sincronizando eventos de mañana con Google Calendar…")
-            refreshTomorrowGoogleCalendarEvents(silent = false)
+            postStatus("Token OAuth 2.0 guardado. Sincronizando eventos con Google Calendar…")
+            refreshGoogleCalendarEvents(silent = false)
         }
     }
 
@@ -507,7 +649,12 @@ class NightPlannerViewModel(application: Application) : AndroidViewModel(applica
     fun disconnectGoogleCalendar() {
         viewModelScope.launch {
             oAuthPrefs.disconnectAccount()
-            controlState.update { it.copy(importedEvents = emptyList()) }
+            controlState.update {
+                it.copy(
+                    importedTodayEvents = emptyList(),
+                    importedTomorrowEvents = emptyList()
+                )
+            }
             postStatus("Cuenta de Google Calendar desconectada.")
         }
     }

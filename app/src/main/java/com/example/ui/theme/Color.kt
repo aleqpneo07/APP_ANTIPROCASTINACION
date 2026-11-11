@@ -48,3 +48,17 @@ val PriorityLowColor = Color(0xFF6B9ED4)       // Soft Slate Blue - Baja
 val SyncSuccessGreen = Color(0xFF38B28B)       // Muted Sage Green
 val ConflictWarningRed = Color(0xFFDE6473)     // Soft Coral Red
 val CalendarImportedPurple = Color(0xFFA78BFA) // Soft Lavender Purple
+
+// University Schedule Subject Colors (Harmonized for Dark Nocturnal Studio)
+val UniSubjectPhv = Color(0xFFE08855)          // Soft Terracotta (PHVIM)
+val UniSubjectDeso = Color(0xFF5BAED6)         // Soft Cerulean (DESO)
+val UniSubjectMp = Color(0xFF38B28B)           // Muted Emerald (MP)
+val UniSubjectBd = Color(0xFFA78BFA)           // Soft Lavender (BD)
+val UniSubjectAmc = Color(0xFFDE6473)          // Soft Crimson (AMC)
+val UniSubjectRa = Color(0xFFD4A359)           // Warm Gold (RA)
+
+// University Building Colors (Harmonized for Dark Nocturnal Studio)
+val UniBuildingGalilei = Color(0xFF5BAED6)     // Galileo Galilei
+val UniBuildingMorales = Color(0xFF38B28B)     // Isidoro Morales
+val UniBuildingJim = Color(0xFFB5896B)         // JIM
+val UniBuildingEtp = Color(0xFF94A3B8)         // ETP

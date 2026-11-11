@@ -21,7 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,6 +33,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,9 +46,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.model.NightTaskEntity
 import com.example.ui.NightPlannerUiState
+import com.example.ui.TaskDayFilter
 import com.example.ui.theme.CalendarImportedPurple
 import com.example.ui.theme.ConflictWarningRed
 import com.example.ui.theme.ElectricIndigo
+import com.example.ui.theme.ElectricIndigoBright
 import com.example.ui.theme.NightBgDeep
 import com.example.ui.theme.NightBorderSubtle
 import com.example.ui.theme.NightCardElevated
@@ -62,23 +68,55 @@ private data class TimelineBlockItem(
     val subtitle: String,
     val accentColor: Color,
     val isExternalGoogleEvent: Boolean,
+    val isUniClass: Boolean,
     val hasConflict: Boolean
 )
 
 @Composable
 fun TimelineAndConflictsScreen(
     state: NightPlannerUiState,
+    onSelectDayFilter: (TaskDayFilter) -> Unit,
+    onToggleIncludeUniClasses: () -> Unit,
     onAssignTaskToFreeSlot: (task: NightTaskEntity, startHHmm: String, durationMin: Int) -> Unit,
     onRefreshCalendarEvents: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val conflictTaskIds = state.overlapWarnings.map { it.taskId }.toSet()
-    val syncedTaskEventIds = state.tomorrowTasks
+    val isTomorrow = state.selectedDayFilter == TaskDayFilter.TOMORROW
+    val targetLabel = if (isTomorrow) "Mañana · ${state.tomorrowHumanEs}" else "Hoy · ${state.todayHumanEs}"
+    val tasks = if (isTomorrow) state.tomorrowTasks else state.todayTasks
+    val externalEvents = if (isTomorrow) state.importedTomorrowEvents else state.importedTodayEvents
+    val uniClasses = if (isTomorrow) state.tomorrowUniClasses else state.todayUniClasses
+    val overlapWarnings = if (isTomorrow) state.overlapWarningsTomorrow else state.overlapWarningsToday
+    val freeSlots = if (isTomorrow) state.freeTimeSlotsTomorrow else state.freeTimeSlotsToday
+
+    val conflictTaskIds = overlapWarnings.map { it.taskId }.toSet()
+    val syncedTaskEventIds = tasks
         .mapNotNull { it.googleEventId?.takeIf { id -> id.isNotBlank() } }
         .toSet()
 
     val timelineBlocks = buildList {
-        state.importedTomorrowEvents
+        // 1. University Schedule Classes for that day
+        if (state.includeUniInFreeSlots) {
+            uniClasses.forEach { session ->
+                val typeTag = if (session.isPractice) "Prácticas" else "Teoría"
+                val groupInfo = session.groupLabel?.let { " · $it" }.orEmpty()
+                add(
+                    TimelineBlockItem(
+                        startTimeHHmm = session.startHHmm,
+                        endTimeHHmm = session.endHHmm,
+                        title = "${session.subject.abbr} ($typeTag)$groupInfo",
+                        subtitle = "${session.room} · ${session.building.displayName}",
+                        accentColor = session.subject.color,
+                        isExternalGoogleEvent = false,
+                        isUniClass = true,
+                        hasConflict = false
+                    )
+                )
+            }
+        }
+
+        // 2. Imported Google Calendar Events
+        externalEvents
             .filter { ext ->
                 ext.id !in syncedTaskEventIds &&
                     !ext.isAllDay &&
@@ -91,15 +129,17 @@ fun TimelineAndConflictsScreen(
                         startTimeHHmm = ext.startTimeHHmm!!,
                         endTimeHHmm = ext.endTimeHHmm!!,
                         title = ext.title,
-                        subtitle = "Google Calendar (Importado modo lectura)",
+                        subtitle = "Google Calendar (Importado)",
                         accentColor = CalendarImportedPurple,
                         isExternalGoogleEvent = true,
+                        isUniClass = false,
                         hasConflict = false
                     )
                 )
             }
 
-        state.tomorrowTasks
+        // 3. User's Planned Tasks
+        tasks
             .filter { !it.startTime.isNullOrBlank() && !it.endTime.isNullOrBlank() }
             .forEach { task ->
                 add(
@@ -110,13 +150,14 @@ fun TimelineAndConflictsScreen(
                         subtitle = "${task.categoryEnum.displayName} · Prioridad ${task.priorityEnum.displayName}",
                         accentColor = task.categoryEnum.color,
                         isExternalGoogleEvent = false,
+                        isUniClass = false,
                         hasConflict = task.id in conflictTaskIds
                     )
                 )
             }
     }.sortedBy { it.startTimeHHmm }
 
-    val unscheduledTasks = state.tomorrowTasks.filter {
+    val unscheduledTasks = tasks.filter {
         it.startTime.isNullOrBlank() || it.endTime.isNullOrBlank()
     }
 
@@ -127,7 +168,7 @@ fun TimelineAndConflictsScreen(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Header Card
+        // 1. Header Card + Day Toggle
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -138,32 +179,117 @@ fun TimelineAndConflictsScreen(
                 Column(modifier = Modifier.padding(18.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            TaskDayFilter.TODAY to "Hoy",
+                            TaskDayFilter.TOMORROW to "Mañana"
+                        ).forEach { (filter, label) ->
+                            val selected = (!isTomorrow && filter == TaskDayFilter.TODAY) ||
+                                (isTomorrow && filter == TaskDayFilter.TOMORROW)
+                            Surface(
+                                onClick = { onSelectDayFilter(filter) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (selected) ElectricIndigo else NightBgDeep,
+                                border = BorderStroke(1.dp, if (selected) ElectricIndigo else NightBorderSubtle)
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = if (selected) Color.White else TextMutedSlate
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Time Blocking & Prevención de Solapamientos",
+                                text = "Agenda 24h & Solapamientos",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = TextMoonlight
                             )
                             Text(
-                                text = "Mañana · ${state.tomorrowHumanEs}",
+                                text = targetLabel,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = NocturnalAmber
+                                color = ElectricIndigoBright
                             )
                         }
                         OutlinedButton(
                             onClick = onRefreshCalendarEvents,
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Text("Sincronizar Lectura", style = MaterialTheme.typography.labelSmall)
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Calendar", style = MaterialTheme.typography.labelSmall)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    if (state.overlapWarnings.isEmpty()) {
+                    // Toggle University classes visibility & conflict check
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = NightBgDeep,
+                        border = BorderStroke(1.dp, NightBorderSubtle)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.School,
+                                    contentDescription = null,
+                                    tint = NocturnalAmber,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Incluir clases del horario en agenda",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                    color = TextStarlight
+                                )
+                            }
+                            Switch(
+                                checked = state.includeUniInFreeSlots,
+                                onCheckedChange = { onToggleIncludeUniClasses() },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = ElectricIndigo
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (overlapWarnings.isEmpty()) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = SyncSuccessGreen.copy(alpha = 0.12f),
@@ -183,18 +309,18 @@ fun TimelineAndConflictsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "Cero solapamientos horarios. Tus bloques de estudio/gimnasio encajan con tu Google Calendar.",
+                                    text = "Cero solapamientos. Tus actividades encajan con tus clases y Calendar.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SyncSuccessGreen
                                 )
                             }
                         }
                     } else {
-                        state.overlapWarnings.forEach { warning ->
-                            val conflictingTask = state.tomorrowTasks.find { it.id == warning.taskId }
-                            val firstFreeSlot = state.freeTimeSlots.firstOrNull {
+                        overlapWarnings.forEach { warning ->
+                            val conflictingTask = tasks.find { it.id == warning.taskId }
+                            val firstFreeSlot = freeSlots.firstOrNull {
                                 it.durationMinutes >= (conflictingTask?.durationMinutes ?: 60)
-                            } ?: state.freeTimeSlots.firstOrNull()
+                            } ?: freeSlots.firstOrNull()
 
                             Surface(
                                 modifier = Modifier
@@ -243,7 +369,7 @@ fun TimelineAndConflictsScreen(
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = "Reubicar en hueco libre (${firstFreeSlot.startTimeHHmm})",
+                                                text = "Mover a hueco libre (${firstFreeSlot.startTimeHHmm})",
                                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                                             )
                                         }
@@ -266,19 +392,19 @@ fun TimelineAndConflictsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Huecos Libres Disponibles Mañana (08:00 – 22:00)",
+                        text = "Huecos Libres Disponibles (08:00 – 22:00)",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = SyncSuccessGreen
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Calculados restando tus eventos de Google Calendar y tareas ya bloqueadas.",
+                        text = "Calculados restando tus clases universitarias, Calendar y tareas asignadas.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextMutedSlate
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    state.freeTimeSlots.forEach { slot ->
+                    freeSlots.forEach { slot ->
                         val hours = slot.durationMinutes / 60
                         val mins = slot.durationMinutes % 60
                         val durLabel = if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
@@ -330,7 +456,7 @@ fun TimelineAndConflictsScreen(
         }
 
         // 3. Unscheduled Tasks Quick-Assign to Free Slot
-        if (unscheduledTasks.isNotEmpty() && state.freeTimeSlots.isNotEmpty()) {
+        if (unscheduledTasks.isNotEmpty() && freeSlots.isNotEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -340,16 +466,16 @@ fun TimelineAndConflictsScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Tareas sin hora fija (${unscheduledTasks.size}) · Asignación rápida a Hueco Libre",
+                            text = "Tareas sin hora fija (${unscheduledTasks.size}) · Asignación rápida",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = ElectricIndigo
+                            color = ElectricIndigoBright
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         unscheduledTasks.forEach { task ->
                             val taskDur = task.durationMinutes ?: 60
-                            val suggestedSlot = state.freeTimeSlots.firstOrNull {
+                            val suggestedSlot = freeSlots.firstOrNull {
                                 it.durationMinutes >= taskDur
-                            } ?: state.freeTimeSlots.first()
+                            } ?: freeSlots.first()
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -395,7 +521,7 @@ fun TimelineAndConflictsScreen(
         // 4. Chronological Timeline Blocks
         item {
             Text(
-                text = "Línea de Tiempo Cronológica de Mañana (${timelineBlocks.size} bloques)",
+                text = "Línea de Tiempo (${timelineBlocks.size} bloques)",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = TextMoonlight
             )
@@ -453,8 +579,23 @@ fun TimelineAndConflictsScreen(
                             Text(
                                 text = block.title,
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = TextMoonlight
+                                color = TextMoonlight,
+                                modifier = Modifier.weight(1f)
                             )
+                            if (block.isUniClass) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = block.accentColor.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, block.accentColor.copy(alpha = 0.35f))
+                                ) {
+                                    Text(
+                                        text = "UNI",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = block.accentColor,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(

@@ -46,6 +46,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,7 +68,10 @@ import com.example.model.FreeTimeSlot
 import com.example.model.QuickInputParser
 import com.example.model.TaskCategory
 import com.example.model.TaskPriority
+import com.example.ui.TaskDayFilter
 import com.example.ui.theme.ElectricIndigo
+import com.example.ui.theme.ElectricIndigoBright
+import com.example.ui.theme.NightBgDeep
 import com.example.ui.theme.NightBorderSubtle
 import com.example.ui.theme.NightCardElevated
 import com.example.ui.theme.NightCardSurface
@@ -79,10 +83,18 @@ import com.example.ui.theme.TextStarlight
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NocturnalQuickAddCard(
-    tomorrowHumanDate: String,
-    freeSlots: List<FreeTimeSlot>,
+fun TaskQuickAddCard(
+    todayIso: String,
+    tomorrowIso: String,
+    afterTomorrowIso: String,
+    selectedDayFilter: TaskDayFilter,
+    freeSlotsToday: List<FreeTimeSlot>,
+    freeSlotsTomorrow: List<FreeTimeSlot>,
+    prefillTitle: String?,
+    prefillCategory: TaskCategory?,
+    onPrefillConsumed: () -> Unit,
     onAddTask: (
+        targetDateIso: String,
         rawTitle: String,
         notes: String,
         category: TaskCategory,
@@ -98,21 +110,53 @@ fun NocturnalQuickAddCard(
 
     var rawTitle by rememberSaveable { mutableStateOf("") }
     var notes by rememberSaveable { mutableStateOf("") }
+    var chosenDateIso by rememberSaveable { mutableStateOf(todayIso) }
     var selectedCategory by rememberSaveable { mutableStateOf(TaskCategory.UNIVERSIDAD) }
     var selectedPriority by rememberSaveable { mutableStateOf(TaskPriority.ALTA) }
     var startTimeInput by rememberSaveable { mutableStateOf("") }
     var endTimeInput by rememberSaveable { mutableStateOf("") }
     var durationInput by rememberSaveable { mutableStateOf("60") }
     var syncWithCalendar by rememberSaveable { mutableStateOf(true) }
-    var showAdvancedOptions by rememberSaveable { mutableStateOf(true) }
+    var showAdvancedOptions by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(selectedDayFilter) {
+        when (selectedDayFilter) {
+            TaskDayFilter.TODAY -> chosenDateIso = todayIso
+            TaskDayFilter.TOMORROW -> chosenDateIso = tomorrowIso
+            TaskDayFilter.ALL -> Unit
+        }
+    }
+
+    LaunchedEffect(prefillTitle) {
+        if (!prefillTitle.isNullOrBlank()) {
+            rawTitle = prefillTitle
+            if (prefillCategory != null) selectedCategory = prefillCategory
+            showAdvancedOptions = true
+            onPrefillConsumed()
+        }
+    }
 
     val liveParsed by remember(rawTitle) {
         derivedStateOf { QuickInputParser.parse(rawTitle) }
     }
 
+    val activeFreeSlots = when (chosenDateIso) {
+        tomorrowIso -> freeSlotsTomorrow
+        todayIso -> freeSlotsToday
+        else -> emptyList()
+    }
+
+    val chosenDateLabel = when (chosenDateIso) {
+        todayIso -> "Hoy"
+        tomorrowIso -> "Mañana"
+        afterTomorrowIso -> "Pasado mañana"
+        else -> chosenDateIso
+    }
+
     val submitTask = {
         if (rawTitle.isNotBlank()) {
             onAddTask(
+                chosenDateIso,
                 rawTitle,
                 notes,
                 selectedCategory,
@@ -133,11 +177,11 @@ fun NocturnalQuickAddCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .testTag("nocturnal_quick_add_card"),
+            .testTag("task_quick_add_card"),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = NightCardElevated),
-        border = BorderStroke(1.dp, ElectricIndigo.copy(alpha = 0.45f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        border = BorderStroke(1.dp, ElectricIndigo.copy(alpha = 0.35f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
@@ -158,25 +202,25 @@ fun NocturnalQuickAddCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(ElectricIndigo.copy(alpha = 0.12f)),
+                            .background(ElectricIndigo.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.AutoAwesome,
                             contentDescription = null,
-                            tint = ElectricIndigo,
+                            tint = ElectricIndigoBright,
                             modifier = Modifier.size(16.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Añadir tarea para mañana",
+                            text = "Proponer tarea o actividad",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = TextMoonlight
                         )
                         Text(
-                            text = "Asignación: $tomorrowHumanDate",
+                            text = "Se guardará para $chosenDateLabel",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMutedSlate
                         )
@@ -202,14 +246,14 @@ fun NocturnalQuickAddCard(
                         Icon(
                             imageVector = if (showAdvancedOptions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                             contentDescription = null,
-                            tint = if (showAdvancedOptions) ElectricIndigo else TextMutedSlate,
+                            tint = if (showAdvancedOptions) ElectricIndigoBright else TextMutedSlate,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (showAdvancedOptions) "Compacto" else "Opciones",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                            color = if (showAdvancedOptions) ElectricIndigo else TextMutedSlate
+                            color = if (showAdvancedOptions) ElectricIndigoBright else TextMutedSlate
                         )
                     }
                 }
@@ -217,7 +261,46 @@ fun NocturnalQuickAddCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Main Quick Input TextField with Keyboard Shortcut support
+            // Quick Target Date Chips (Hoy / Mañana / Pasado)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(
+                    todayIso to "Para Hoy",
+                    tomorrowIso to "Para Mañana",
+                    afterTomorrowIso to "Pasado"
+                ).forEach { (dateIso, label) ->
+                    val selected = chosenDateIso == dateIso
+                    FilterChip(
+                        selected = selected,
+                        onClick = { chosenDateIso = dateIso },
+                        modifier = Modifier.weight(1f),
+                        label = {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ElectricIndigo.copy(alpha = 0.2f),
+                            selectedLabelColor = ElectricIndigoBright,
+                            containerColor = NightBgDeep,
+                            labelColor = TextMutedSlate
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = selected,
+                            selectedBorderColor = ElectricIndigo.copy(alpha = 0.5f),
+                            borderColor = NightBorderSubtle
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Main Quick Input TextField
             OutlinedTextField(
                 value = rawTitle,
                 onValueChange = { rawTitle = it },
@@ -238,8 +321,8 @@ fun NocturnalQuickAddCard(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = ElectricIndigo,
                     unfocusedBorderColor = NightBorderSubtle,
-                    focusedContainerColor = Color(0xFF0A101E),
-                    unfocusedContainerColor = Color(0xFF0A101E),
+                    focusedContainerColor = NightBgDeep,
+                    unfocusedContainerColor = NightBgDeep,
                     focusedTextColor = TextMoonlight,
                     unfocusedTextColor = TextMoonlight
                 )
@@ -266,13 +349,14 @@ fun NocturnalQuickAddCard(
                     "#personal",
                     "!alta",
                     "!media",
-                    "@09:00-10:30",
-                    "@17:00-18:00",
-                    "+45m"
+                    "@10:00",
+                    "@18:00-19:30",
+                    "+45m",
+                    "+90m"
                 ).forEach { token ->
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF0E1629),
+                        color = NightCardSurface,
                         border = BorderStroke(1.dp, NightBorderSubtle),
                         modifier = Modifier.clickable {
                             rawTitle = if (rawTitle.isBlank()) "$token " else "${rawTitle.trimEnd()} $token "
@@ -281,7 +365,7 @@ fun NocturnalQuickAddCard(
                         Text(
                             text = token,
                             style = MaterialTheme.typography.labelSmall,
-                            color = ElectricIndigo,
+                            color = ElectricIndigoBright,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                         )
                     }
@@ -320,20 +404,22 @@ fun NocturnalQuickAddCard(
                         }
                         liveParsed.detectedStartTime?.let { st ->
                             val endLabel = liveParsed.detectedEndTime ?: "…"
-                            SmallBadgePill(text = "⏰ $st-$endLabel", accentColor = ElectricIndigo)
+                            SmallBadgePill(text = "$st–$endLabel", accentColor = ElectricIndigoBright)
+                        }
+                        liveParsed.detectedDurationMinutes?.let { dur ->
+                            SmallBadgePill(text = "${dur} min", accentColor = SyncSuccessGreen)
                         }
                     }
                 }
             }
 
-            // Expandable Selectors: Category, Priority, Time-Blocking, Free Slots, Calendar Sync
+            // Expandable Details: Notes, Category, Priority, Time-Blocking, Free Slots, Calendar Sync
             AnimatedVisibility(visible = showAdvancedOptions) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(color = NightBorderSubtle)
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Optional Notes Input
                     OutlinedTextField(
                         value = notes,
                         onValueChange = { notes = it },
@@ -341,16 +427,15 @@ fun NocturnalQuickAddCard(
                             .fillMaxWidth()
                             .testTag("quick_task_notes_input"),
                         label = { Text("Notas / Descripción (Opcional)", style = MaterialTheme.typography.labelSmall) },
-                        placeholder = { Text("Detalles adicionales que se sincronizarán en Google Calendar…") },
+                        placeholder = { Text("Detalles o entrega (se envía a Google Calendar)…") },
                         maxLines = 2,
                         shape = RoundedCornerShape(12.dp)
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Category Selection Row
                     Text(
-                        text = "Categoría (con color en Google Calendar)",
+                        text = "Categoría",
                         style = MaterialTheme.typography.labelLarge,
                         color = TextStarlight
                     )
@@ -375,7 +460,7 @@ fun NocturnalQuickAddCard(
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = category.color.copy(alpha = 0.22f),
                                     selectedLabelColor = category.color,
-                                    containerColor = Color(0xFF0A101E),
+                                    containerColor = NightBgDeep,
                                     labelColor = TextMutedSlate
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
@@ -390,9 +475,8 @@ fun NocturnalQuickAddCard(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Priority Selection Row
                     Text(
-                        text = "Prioridad de ejecución",
+                        text = "Prioridad",
                         style = MaterialTheme.typography.labelLarge,
                         color = TextStarlight
                     )
@@ -416,7 +500,7 @@ fun NocturnalQuickAddCard(
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = priority.color.copy(alpha = 0.22f),
                                     selectedLabelColor = priority.color,
-                                    containerColor = Color(0xFF0A101E),
+                                    containerColor = NightBgDeep,
                                     labelColor = TextMutedSlate
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
@@ -431,7 +515,6 @@ fun NocturnalQuickAddCard(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Time Blocking Inputs (Start, End, Duration)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -441,12 +524,12 @@ fun NocturnalQuickAddCard(
                             Icon(
                                 imageVector = Icons.Default.Schedule,
                                 contentDescription = null,
-                                tint = ElectricIndigo,
+                                tint = ElectricIndigoBright,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Time Blocking (Opcional)",
+                                text = "Horario y tiempo estimado",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = TextStarlight
                             )
@@ -458,7 +541,7 @@ fun NocturnalQuickAddCard(
                                     endTimeInput = ""
                                 }
                             ) {
-                                Text("Limpiar hora (Todo el día)", style = MaterialTheme.typography.labelSmall)
+                                Text("Limpiar hora", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -475,8 +558,8 @@ fun NocturnalQuickAddCard(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("quick_start_time_input"),
-                            label = { Text("Inicio (HH:mm)", style = MaterialTheme.typography.labelSmall) },
-                            placeholder = { Text("09:00") },
+                            label = { Text("Inicio", style = MaterialTheme.typography.labelSmall) },
+                            placeholder = { Text("17:00") },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp)
                         )
@@ -486,8 +569,8 @@ fun NocturnalQuickAddCard(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("quick_end_time_input"),
-                            label = { Text("Fin (HH:mm)", style = MaterialTheme.typography.labelSmall) },
-                            placeholder = { Text("10:30") },
+                            label = { Text("Fin", style = MaterialTheme.typography.labelSmall) },
+                            placeholder = { Text("18:30") },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp)
                         )
@@ -495,7 +578,7 @@ fun NocturnalQuickAddCard(
                             value = durationInput,
                             onValueChange = { durationInput = it.filter { ch -> ch.isDigit() }.take(3) },
                             modifier = Modifier
-                                .width(104.dp)
+                                .width(100.dp)
                                 .testTag("quick_duration_input"),
                             label = { Text("Minutos", style = MaterialTheme.typography.labelSmall) },
                             placeholder = { Text("60") },
@@ -504,11 +587,11 @@ fun NocturnalQuickAddCard(
                         )
                     }
 
-                    // 1-Tap Free Slot Suggestions ("Huecos Libres de Mañana")
-                    if (freeSlots.isNotEmpty()) {
+                    // Free Slot Suggestions for chosen date (accounting for uni classes + Google Calendar)
+                    if (activeFreeSlots.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Huecos libres detectados mañana (toca para asignar bloque):",
+                            text = "Huecos libres ($chosenDateLabel, sin clases ni Calendar):",
                             style = MaterialTheme.typography.labelSmall,
                             color = SyncSuccessGreen
                         )
@@ -519,7 +602,7 @@ fun NocturnalQuickAddCard(
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            freeSlots.take(6).forEach { slot ->
+                            activeFreeSlots.take(6).forEach { slot ->
                                 val suggestedEnd = QuickInputParser.addMinutesToHHmm(
                                     slot.startTimeHHmm,
                                     (durationInput.toIntOrNull() ?: 60).coerceAtMost(slot.durationMinutes)
@@ -527,14 +610,14 @@ fun NocturnalQuickAddCard(
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = SyncSuccessGreen.copy(alpha = 0.12f),
-                                    border = BorderStroke(1.dp, SyncSuccessGreen.copy(alpha = 0.4f)),
+                                    border = BorderStroke(1.dp, SyncSuccessGreen.copy(alpha = 0.35f)),
                                     modifier = Modifier.clickable {
                                         startTimeInput = slot.startTimeHHmm
                                         endTimeInput = suggestedEnd
                                     }
                                 ) {
                                     Text(
-                                        text = "Libre ${slot.startTimeHHmm}–${slot.endTimeHHmm} (${slot.periodLabel})",
+                                        text = "${slot.startTimeHHmm}–${slot.endTimeHHmm} (${slot.periodLabel})",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = SyncSuccessGreen,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -549,7 +632,7 @@ fun NocturnalQuickAddCard(
                     // Sync with Google Calendar Toggle
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF0A101E),
+                        color = NightBgDeep,
                         border = BorderStroke(1.dp, NightBorderSubtle)
                     ) {
                         Row(
@@ -572,15 +655,15 @@ fun NocturnalQuickAddCard(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
-                                        text = "Sincronizar con Google Calendar (syncWithCalendar)",
+                                        text = "Enviar a Google Calendar",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                         color = TextMoonlight
                                     )
                                     Text(
                                         text = if (startTimeInput.isNotBlank()) {
-                                            "Se creará con bloque exacto ($startTimeInput - ${endTimeInput.ifBlank { "…" }})"
+                                            "Bloque $startTimeInput – ${endTimeInput.ifBlank { "…" }}"
                                         } else {
-                                            "Sin hora fija: se creará como 'Todo el día' o bloque por defecto"
+                                            "Sin hora fija: todo el día o bloque por defecto"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = TextMutedSlate
@@ -610,11 +693,11 @@ fun NocturnalQuickAddCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
-                    .testTag("submit_add_tomorrow_task_btn"),
+                    .testTag("submit_add_task_btn"),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = ElectricIndigo,
-                    contentColor = Color(0xFF080C16)
+                    contentColor = Color.White
                 )
             ) {
                 Icon(
@@ -624,7 +707,7 @@ fun NocturnalQuickAddCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Añadir al Plan de Mañana",
+                    text = "Añadir para $chosenDateLabel",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
             }

@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -35,15 +34,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.filled.ViewTimeline
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.NightsStay
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.ViewTimeline
-import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -73,9 +71,9 @@ import com.example.ui.NightPlannerUiState
 import com.example.ui.NightPlannerViewModel
 import com.example.ui.components.EditTaskBottomSheet
 import com.example.ui.components.GoogleCalendarSetupScreen
-import com.example.ui.components.PlanTomorrowScreen
+import com.example.ui.components.TasksWorkspaceScreen
 import com.example.ui.components.TimelineAndConflictsScreen
-import com.example.ui.components.TodayExecutionScreen
+import com.example.ui.components.UniversityScheduleScreen
 import com.example.ui.theme.ConflictWarningRed
 import com.example.ui.theme.ElectricIndigo
 import com.example.ui.theme.ElectricIndigoBright
@@ -139,38 +137,37 @@ fun NightPlannerAppRoot(
     state: NightPlannerUiState,
     viewModel: NightPlannerViewModel
 ) {
-    // BackHandler on secondary tabs returns to primary Plan Tomorrow screen
-    if (state.activeTab != NightPlannerTab.PLAN_TOMORROW) {
+    if (state.activeTab != NightPlannerTab.TASKS) {
         BackHandler {
-            viewModel.selectTab(NightPlannerTab.PLAN_TOMORROW)
+            viewModel.selectTab(NightPlannerTab.TASKS)
         }
     }
 
     val navItems = listOf(
         NavTabSpec(
-            tab = NightPlannerTab.PLAN_TOMORROW,
-            label = "Mañana",
-            selectedIcon = Icons.Filled.NightsStay,
-            unselectedIcon = Icons.Outlined.NightsStay,
-            badgeCount = state.tomorrowTasks.size,
+            tab = NightPlannerTab.TASKS,
+            label = "Tareas",
+            selectedIcon = Icons.Filled.TaskAlt,
+            unselectedIcon = Icons.Outlined.TaskAlt,
+            badgeCount = state.todayPendingCount,
             badgeColor = ElectricIndigo,
-            testTag = "nav_tab_plan_tomorrow"
+            testTag = "nav_tab_tasks"
         ),
         NavTabSpec(
-            tab = NightPlannerTab.EXECUTE_TODAY,
-            label = "Hoy",
-            selectedIcon = Icons.Filled.WbSunny,
-            unselectedIcon = Icons.Outlined.WbSunny,
-            badgeCount = state.todayPendingCount,
+            tab = NightPlannerTab.UNIVERSITY_SCHEDULE,
+            label = "Horario",
+            selectedIcon = Icons.Filled.School,
+            unselectedIcon = Icons.Outlined.School,
+            badgeCount = 0,
             badgeColor = NocturnalAmber,
-            testTag = "nav_tab_today"
+            testTag = "nav_tab_schedule"
         ),
         NavTabSpec(
             tab = NightPlannerTab.TIMELINE_CONFLICTS,
-            label = "Agenda 24h",
+            label = "Agenda",
             selectedIcon = Icons.Filled.ViewTimeline,
             unselectedIcon = Icons.Outlined.ViewTimeline,
-            badgeCount = state.overlapWarnings.size,
+            badgeCount = state.totalOverlapCount,
             badgeColor = ConflictWarningRed,
             testTag = "nav_tab_timeline"
         ),
@@ -220,7 +217,7 @@ fun NightPlannerAppRoot(
                                             if (item.badgeCount > 0) {
                                                 Badge(
                                                     containerColor = item.badgeColor,
-                                                    contentColor = Color(0xFF080C16)
+                                                    contentColor = Color.White
                                                 ) {
                                                     Text(item.badgeCount.toString())
                                                 }
@@ -277,7 +274,7 @@ fun NightPlannerAppRoot(
                                             if (item.badgeCount > 0) {
                                                 Badge(
                                                     containerColor = item.badgeColor,
-                                                    contentColor = Color(0xFF080C16)
+                                                    contentColor = Color.White
                                                 ) {
                                                     Text(item.badgeCount.toString())
                                                 }
@@ -302,7 +299,6 @@ fun NightPlannerAppRoot(
                         .widthIn(max = 840.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Status Feedback Banner
                     AnimatedVisibility(
                         visible = !state.statusBannerMessage.isNullOrBlank(),
                         enter = fadeIn(),
@@ -315,44 +311,43 @@ fun NightPlannerAppRoot(
                         )
                     }
 
-                    // Active Screen Content
                     Box(modifier = Modifier.fillMaxSize()) {
                         when (state.activeTab) {
-                            NightPlannerTab.PLAN_TOMORROW -> {
-                                PlanTomorrowScreen(
+                            NightPlannerTab.TASKS -> {
+                                TasksWorkspaceScreen(
                                     state = state,
-                                    onAddTask = viewModel::addTaskForTomorrow,
+                                    onSelectDayFilter = viewModel::selectDayFilter,
+                                    onSelectCategoryFilter = viewModel::setCategoryFilter,
+                                    onAddTask = viewModel::addTaskForDate,
+                                    onPrefillConsumed = viewModel::consumeComposerPrefill,
                                     onToggleComplete = viewModel::toggleTaskCompletion,
                                     onEditTask = viewModel::openEditTask,
                                     onDeleteTask = viewModel::deleteTask,
-                                    onSelectCategoryFilter = viewModel::setTomorrowCategoryFilter,
-                                    onConfirmAndSyncTomorrow = viewModel::confirmAndSyncTomorrow,
+                                    onConfirmAndSyncActiveDate = viewModel::confirmAndSyncActiveDateTasks,
                                     onRefreshCalendarEvents = {
-                                        viewModel.refreshTomorrowGoogleCalendarEvents(silent = false)
+                                        viewModel.refreshGoogleCalendarEvents(silent = false)
                                     },
+                                    onMigratePendingToTomorrow = viewModel::migratePendingTodayToTomorrow,
                                     onNavigateToOAuthSetup = {
                                         viewModel.selectTab(NightPlannerTab.GOOGLE_CALENDAR_GUIDE)
                                     }
                                 )
                             }
 
-                            NightPlannerTab.EXECUTE_TODAY -> {
-                                TodayExecutionScreen(
-                                    state = state,
-                                    onToggleComplete = viewModel::toggleTaskCompletion,
-                                    onEditTask = viewModel::openEditTask,
-                                    onDeleteTask = viewModel::deleteTask,
-                                    onSelectCategoryFilter = viewModel::setTodayCategoryFilter,
-                                    onMigratePendingToTomorrow = viewModel::migratePendingTodayToTomorrow
+                            NightPlannerTab.UNIVERSITY_SCHEDULE -> {
+                                UniversityScheduleScreen(
+                                    onCreateTaskFromClass = viewModel::prefillTaskFromUniClass
                                 )
                             }
 
                             NightPlannerTab.TIMELINE_CONFLICTS -> {
                                 TimelineAndConflictsScreen(
                                     state = state,
+                                    onSelectDayFilter = viewModel::selectDayFilter,
+                                    onToggleIncludeUniClasses = viewModel::toggleIncludeUniInFreeSlots,
                                     onAssignTaskToFreeSlot = viewModel::assignTaskToTimeWindow,
                                     onRefreshCalendarEvents = {
-                                        viewModel.refreshTomorrowGoogleCalendarEvents(silent = false)
+                                        viewModel.refreshGoogleCalendarEvents(silent = false)
                                     }
                                 )
                             }
@@ -373,7 +368,6 @@ fun NightPlannerAppRoot(
             }
         }
 
-        // Edit Task Bottom Sheet if active
         state.editingTask?.let { editing ->
             EditTaskBottomSheet(
                 task = editing,
@@ -414,9 +408,9 @@ private fun NightPlannerTopBar(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.NightsStay,
+                        imageVector = Icons.Default.TaskAlt,
                         contentDescription = "NightPlanner Logo",
-                        tint = NocturnalAmber,
+                        tint = ElectricIndigoBright,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -428,7 +422,7 @@ private fun NightPlannerTopBar(
                         color = TextMoonlight
                     )
                     Text(
-                        text = "Ritual Nocturno · Time Blocking",
+                        text = "Tareas · Horario · Calendar",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextMutedSlate
                     )

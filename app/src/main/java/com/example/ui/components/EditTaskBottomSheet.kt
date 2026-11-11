@@ -125,6 +125,7 @@ fun EditTaskBottomSheet(
                 style = MaterialTheme.typography.labelLarge,
                 color = TextMutedSlate
             )
+            val afterTomorrowIso = DateTimeHelper.addDaysToIso(todayIso, 2)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -132,13 +133,19 @@ fun EditTaskBottomSheet(
                 FilterChip(
                     selected = targetDateIso == todayIso,
                     onClick = { targetDateIso = todayIso },
-                    label = { Text("☀️ Hoy ($todayIso)") },
+                    label = { Text("Hoy") },
                     modifier = Modifier.weight(1f)
                 )
                 FilterChip(
                     selected = targetDateIso == tomorrowIso,
                     onClick = { targetDateIso = tomorrowIso },
-                    label = { Text("🌙 Mañana ($tomorrowIso)") },
+                    label = { Text("Mañana") },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = targetDateIso == afterTomorrowIso,
+                    onClick = { targetDateIso = afterTomorrowIso },
+                    label = { Text("Pasado") },
                     modifier = Modifier.weight(1f)
                 )
             }

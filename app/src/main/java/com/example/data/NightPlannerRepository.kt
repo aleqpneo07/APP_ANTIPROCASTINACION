@@ -23,6 +23,8 @@ class NightPlannerRepository(
 ) {
     val oAuthSettingsFlow: Flow<OAuthSettingsState> = oAuthPrefs.settingsFlow
 
+    fun observeAllTasks(): Flow<List<NightTaskEntity>> = dao.observeAllTasks()
+
     fun observeTasksForDate(dateIso: String): Flow<List<NightTaskEntity>> =
         dao.observeTasksForDate(dateIso)
 

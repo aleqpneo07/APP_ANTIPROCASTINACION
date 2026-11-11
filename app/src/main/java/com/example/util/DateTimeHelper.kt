@@ -42,6 +42,13 @@ object DateTimeHelper {
         return raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase(esLocale) else it.toString() }
     }
 
+    fun dayOfWeekFromIso(dateIso: String): Int {
+        val parsed = runCatching { isoFormat.parse(dateIso) }.getOrNull() ?: return -1
+        val cal = Calendar.getInstance()
+        cal.time = parsed
+        return cal.get(Calendar.DAY_OF_WEEK)
+    }
+
     fun currentTimeGreetingEs(): Pair<String, Boolean> {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val isNight = hour >= 19 || hour < 5
